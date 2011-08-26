@@ -1,0 +1,63 @@
+===================
+=== Audiomapper ===
+===================
+Dieses Programm ist freie Software und steht unter der GPLv3
+oder spaeter. 
+copyright 2011 Stephan Spielmann
+
+====================
+== "Installation" ==
+====================
+Das Programm wurde fuer shr-unstable geschrieben und getestet. 
+Ich musste nach dem Installieren von SHR noch PyGTK installieren
+und danach hats funktioniert.
+Die Dateien an ihre entsprechende Position kopieren. Der Ort jeder
+Datei steht im Abschnitt "Dateien und Beschreibungen".
+Bei der SHR-unstable-Version vom 18.5.2011 tauchte nach dem 
+kopieren der Dateien kein Icon im Launcher auf. Mit dem
+Befehl "enlightment_remote -restart" habe ich das Enlightment
+neu gestartet und danach hatte ich das Symbol im Launcher.
+
+===============
+== Bedienung ==
+===============
+Das Programm verbindet sich zu Beginn ueber DBUS mit dem GPS-Daemon
+und reagiert danach auf jede Positionsaenderung. Man kann noch nicht
+sehen, ob der GPS-Daemon einen Satteliten fixiert hat. Das steht
+aber noch auf meiner TODO-Liste.
+Die GPX-Logdatei wird beim Start des Programms erstellt. Bei jeder
+Positionsaenderung werden die GPS-Daten (Laengengrad, Breitengrad,
+Geschwindigkeit, Ausrichtung) in die Log-Datei geschrieben. Als
+Dateiname wird die aktuelle Zeit genutzt. Eine weitere Logdatei wird
+angelegt, in der die Wegpunkte gespeichert werden, an denen man eine
+Aufnahmen gemacht hat und die Audio-Datei wird verlinkt, damit JOSM
+diese direkt mit laden kann.
+
+Die GPX- und Audiodateien werden im HOME-Verzeichnis in einem Ordner
+audiomapper-data gespeichert. Wenn der Ordner noch nicht besteht
+wird dieser automatisch angelegt.
+
+Die Aufnahme Funktioniert, doch die ist bisher nur
+"quick and dirty" implementiert.
+Wenn man auf "record" drueckt wird das Script "capturesound.sh"
+gestartet. Das Script startet eine Tonaufnahme mit arecord und
+speichert die Datei mit der aktuellen Zeit als Dateinamen.
+Nach dem druecken aendert sich die Beschriftung des Knopfes zu
+"stop" und wenn das geschehen ist kann man anfangen zu spechen.
+Wenn man danach auf "stop" drueckt werden alle Prozesse mit dem
+namen "arecord" beendet (Befehl: killall arecord).
+
+==============================
+== Dateien und Beschreibung == 
+==============================
+Diese Datei sorgt dafuer, dass das Programm ein Symbol im Launcher hat.
+/usr/share/applications/audiomapper.desktop
+
+Das Bild wird im Launcher als Icon angezeigt. 
+/usr/share/icons/shr/86x86/apps/audiomapper.png
+
+Die Programmlogik, die GPS-Daten aufzeichnet und ne GUI anzeigt.
+/usr/bin/audiomapper
+
+Das script sorgt dafuer, dass Ton aufgenommen wird, wenn man auf record drueckt.
+/usr/bin/capturesound.sh

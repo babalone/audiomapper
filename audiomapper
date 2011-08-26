@@ -1,0 +1,269 @@
+#!/usr/bin/env python
+
+#    This program is a combination of a GPS-data-logger and voicerecorder to do audiomapping (e.g. with josm).
+#    Copyright (C) 2011  Stephan Spielmann
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+# 
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# TODO: are all these imports needed
+import dbus
+import gobject
+import pygtk
+pygtk.require('2.0')
+import gtk
+import os
+import subprocess
+from dbus.mainloop.glib import DBusGMainLoop
+from datetime import datetime
+
+config_file = "/home/root/.audiomapper"
+
+# TODO: comment
+class AudioMapper:
+
+    # TODO: comment
+
+    # the subprocess for recording should be saved in here to
+    # stop it when pressing the stop-button
+    __subprocess = None
+    gps_course_iface = None
+    gps_position_iface = None
+
+    # this are the default values and they will be changed, if
+    # there are other values in the config file.
+    config = {
+        "DATA_DIR" : "/home/root/audiomapper_data",
+        "NEW_DIR"     : True}
+
+    # TODO: comment
+    def timestampToDateTime(self, timestamp):
+        time = datetime.fromtimestamp(timestamp)
+        return "{0}T{1}".format(time.date(),time.time())
+
+    # This function will load the config file    
+    def loadConfig(self):
+        self.configFile = open(config_file,"r")
+	try:
+            for line in self.configFile:
+                line = line.strip()
+                if not line.startswith("#") and len(line) > 0:
+                    [key, value] = line.split()
+                    if value == "True":
+                        value = True
+                    elif value == "False":
+                        value = False
+                    self.config[key] = value
+                    
+        finally:
+            self.configFile.close()
+        print self.config
+        return self.config   
+        
+        
+
+    # This function will react to a change of the fixation status.
+    # If the fix-status changes the GUI will display another value
+    def fixStatusChanged(self, fixstatus):
+        label = ""
+	if fixstatus == 0:
+		label = "invalid fixstatus"
+        elif fixstatus == 1:
+                label = "unfixed"
+        elif fixstatus == 2:
+                label = "2D-fix"
+        else:
+                label = "3D-fix"
+        self.status.set_text(label)
+
+    # TODO: comment
+    def destroy(self, widget, data = None):
+	gpxfoot = "</gpx>"
+        self._gpxlogfile.write("</trkseg></trk>")
+        self._gpxlogfile.write(gpxfoot)
+        self._wptlogfile.write(gpxfoot)
+        self._gpxlogfile.close()
+        self._wptlogfile.close()
+        gtk.main_quit()
+
+    # TODO: comment
+    def toggled(self, toggleButton):
+        __isActive = toggleButton.get_active()
+        # TODO: funktionen finden, die den externen aufruf ersetzen
+        # TODO: dateinamen auf gps-zeit setzen
+        if __isActive:
+	    time = datetime.now().isoformat()
+            self.__subprocess = subprocess.Popen(["sh","/usr/bin/capturesound.sh", "{0}/{1}.wav".format(self.config["DATA_DIR"],time)])
+            toggleButton.set_label("stop")
+            (validity,timestamp,lat,lon,alt) = self.gps_position_iface.GetPosition()
+            self.printPosition(lat,lon,"./{0}.wav".format(time))
+        else:
+            if self.__subprocess != None:
+                self.__subprocess.kill()
+                os.system("killall arecord")
+            toggleButton.set_label("record")
+
+    # print out the fix status
+    def printStatus(self, gps_device_iface):
+        fixStatus = gps_device_iface.GetFixStatus()
+        print("fix status:"),
+        if fixStatus == 0:
+            print("Invalid")
+        elif fixStatus == 1:
+            print("None")
+        elif fixStatus == 2:
+            print("2 dimensional")
+        elif fixStatus == 3:
+            print("3 dimensional")
+
+    # TODO: comment
+    def printPosition(self, lat, lon, audioFilename):
+	self._wptlogfile.write("<wpt lat=\"{0}\" lon=\"{1}\">".format(lat,lon))
+        self._wptlogfile.write("<desc>audiomapping waypoint</desc>")
+	self._wptlogfile.write("<link href=\"{0}\"><text>{0}</text></link>".format(audioFilename))
+        self._wptlogfile.write("</wpt>")
+
+    # print out the connection status
+    def printConnectionStatus(self, gps_device_iface):
+        connectionStatus = gps_device_iface.GetConnectionStatus()
+        if connectionStatus:
+            print("gps-device is connected")
+        else:
+            print("gps-device seems to be disconnected")
+
+    # print out the current accuracy
+    def printAccuracy(self, gps_accuracy_iface):
+        (validity, pdop, hdop, vdop) = gps_accuracy_iface.GetAccuracy()
+        print("Accuracy:")
+        print("validity: {0}".format(validity))
+        print("pdop: {0}".format(pdop))
+        print("hdop: {0}".format(hdop))
+        print("vdop: {0}".format(vdop))
+        print("")
+
+    # TODO: comment
+    def printPositionChanged(self, validity, timestamp, lat, lon, alt):
+	(field, timestamp, speed, heading, climb) = self.gps_course_iface.GetCourse()
+        self._gpxlogfile.write("<trkpt lat=\"{0}\" lon=\"{1}\">".format(lat, lon))
+        self._gpxlogfile.write("<time>" + self.timestampToDateTime(timestamp) + "</time>")
+	self._gpxlogfile.write("<speed>{0}</speed>".format(speed))
+        self._gpxlogfile.write("<course>{0}</course>".format(heading))
+        self._gpxlogfile.write("</trkpt>")
+    
+    # TODO: comment
+    def __init__(self):
+        self.config = self.loadConfig()
+        if not os.path.exists(self.config["DATA_DIR"]):
+            os.makedirs(self.config["DATA_DIR"])
+        self._gpxlogfile = open("{0}/{1}.gpx".format(self.config["DATA_DIR"],datetime.now().isoformat()),"w")
+        self._wptlogfile = open("{0}/{1}wpt.gpx".format(self.config["DATA_DIR"],datetime.now().isoformat()),"w")
+	gpxhead = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.0"
+    creator="audiomapper.py http://www.bazzinga.eu"
+    xmlns:xsi="http://www.w3c.org/2001/XMLSchema-instance"
+    xmlns="http://www.topografix.com/GPX/1/0">"""
+
+        self._gpxlogfile.write(gpxhead)
+	self._gpxlogfile.write("<trk><trkseg>")
+        self._wptlogfile.write(gpxhead)
+
+        # den DBUS anfahren
+        DBusGMainLoop(set_as_default=True)
+
+        self.loop = gobject.MainLoop()
+
+        self.bus = dbus.SystemBus()
+
+        self.usage_obj = self.bus.get_object('org.freesmartphone.ousaged', '/org/freesmartphone/Usage')
+        self.usage_iface = dbus.Interface(self.usage_obj, 'org.freesmartphone.Usage')
+
+        # interfaces besorgen
+        self.usage_iface.RequestResource("GPS")
+
+        self.gps_daemon = self.bus.get_object("org.freesmartphone.ogpsd",
+                "/org/freedesktop/Gypsy")
+
+        self.gps_position_iface = dbus.Interface(self.gps_daemon,
+                "org.freedesktop.Gypsy.Position")
+
+        self.gps_device_iface = dbus.Interface(self.gps_daemon,
+                "org.freedesktop.Gypsy.Device")
+
+        self.gps_accuracy_iface = dbus.Interface(self.gps_daemon,
+                "org.freedesktop.Gypsy.Accuracy")
+
+        self.gps_course_iface = dbus.Interface(self.gps_daemon,
+                "org.freedesktop.Gypsy.Course")
+
+        # zum PositionChanged-event verbinden
+        self.gps_position_iface.connect_to_signal("PositionChanged",self.printPositionChanged)
+        #self.loop.run()
+
+        # zum FixStatusChanged-event verbinden
+        self.gps_device_iface.connect_to_signal("FixStatusChanged",self.fixStatusChanged)
+
+        # GUI bauen
+        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.connect("destroy",self.destroy)
+        self.window.show()
+
+        # Aufnahmeknopf
+        self.button = gtk.ToggleButton("Record")
+        self.button.connect("toggled",self.toggled)
+
+        # Quit-Button
+        self.quitbutton = gtk.Button("quit")
+        self.quitbutton.connect("clicked",self.destroy)
+
+        # Status-Anzeige
+        self.status = gtk.Label("unfixed")
+	
+	# Tabelle fuer das Layout erstellen
+        self.table = gtk.Table(3,3,True)
+
+        # Der Tabelle die Bedienelemente hinzufuegen
+        self.table.attach(self.button,1,2,1,2)
+        self.table.attach(self.quitbutton,0,1,0,1)
+        self.table.attach(self.status,0,1,1,2)
+
+        #label = self.button.get_children()[0]
+        #label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("red"))
+
+        # Knopf dem Fenster zufuegen
+        self.window.add(self.table)
+
+	# Tabelle sichtbar machen
+        self.table.show()
+
+        # Elemente sichtbar machen
+        self.button.show()
+        self.quitbutton.show()
+        self.status.show()
+
+    
+    # TODO: comment
+    def main(self):
+        gtk.main()
+
+if __name__ == "__main__":
+    audioMapper = AudioMapper()
+    audioMapper.main()
+
+
+
+
+
+
+
+

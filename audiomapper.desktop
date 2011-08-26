@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=audiomapper
+Comment=tool for audiomapping
+Exec=audiomapper
+Icon=audiomapper
+Terminal=false
+Type=Application
+Categories=GTK;Application;Utility;
+MimeType=text/x-vcard;
+X-SingleInstance=true
+StartupNotify=true
