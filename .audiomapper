@@ -1,0 +1,7 @@
+# TODO: implement
+# The directory where the audiomapper saves the data
+DATA_DIR /home/root/audiomapper-data
+
+# TODO: implement
+# Should audiomapper create a new directory for each track?
+NEW_DIR True

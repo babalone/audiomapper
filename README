@@ -59,5 +59,8 @@ Das Bild wird im Launcher als Icon angezeigt.
 Die Programmlogik, die GPS-Daten aufzeichnet und ne GUI anzeigt.
 /usr/bin/audiomapper
 
+Die Konfigurationsdatei, um das Verhalten vom audiomapper zu aendern.
+~/.audiomapper
+
 Das script sorgt dafuer, dass Ton aufgenommen wird, wenn man auf record drueckt.
 /usr/bin/capturesound.sh

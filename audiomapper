@@ -16,23 +16,23 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# TODO: are all these imports needed
+# TODO: are all these imports needed?
 import dbus
 import gobject
 import pygtk
-pygtk.require('2.0')
+# TODO: does this really require version 2.0?
+pygtk.require('2.0') 
 import gtk
 import os
 import subprocess
 from dbus.mainloop.glib import DBusGMainLoop
 from datetime import datetime
 
+# TODO: write config file and parse it
 config_file = "/home/root/.audiomapper"
 
 # TODO: comment
 class AudioMapper:
-
-    # TODO: comment
 
     # the subprocess for recording should be saved in here to
     # stop it when pressing the stop-button
@@ -46,7 +46,8 @@ class AudioMapper:
         "DATA_DIR" : "/home/root/audiomapper_data",
         "NEW_DIR"     : True}
 
-    # TODO: comment
+    # this converts the GPS-timestamp to da
+    # datetime-string for the GPX-file
     def timestampToDateTime(self, timestamp):
         time = datetime.fromtimestamp(timestamp)
         return "{0}T{1}".format(time.date(),time.time())
@@ -67,6 +68,8 @@ class AudioMapper:
                     
         finally:
             self.configFile.close()
+        # TODO: remove this debug-print-command if parsing of the
+        # config file works properly
         print self.config
         return self.config   
         
@@ -86,7 +89,10 @@ class AudioMapper:
                 label = "3D-fix"
         self.status.set_text(label)
 
-    # TODO: comment
+    # This function gets called when the application
+    # gets closed. This function writes some informations
+    # to the end of the GPX-files to make them valid xml
+    # and closes them. The gtk-main_quit is also called
     def destroy(self, widget, data = None):
 	gpxfoot = "</gpx>"
         self._gpxlogfile.write("</trkseg></trk>")
@@ -99,8 +105,8 @@ class AudioMapper:
     # TODO: comment
     def toggled(self, toggleButton):
         __isActive = toggleButton.get_active()
-        # TODO: funktionen finden, die den externen aufruf ersetzen
-        # TODO: dateinamen auf gps-zeit setzen
+        # TODO: calling capturesound.sh works, but i think it's
+        # better to replace it with python-code
         if __isActive:
 	    time = datetime.now().isoformat()
             self.__subprocess = subprocess.Popen(["sh","/usr/bin/capturesound.sh", "{0}/{1}.wav".format(self.config["DATA_DIR"],time)])
@@ -113,33 +119,13 @@ class AudioMapper:
                 os.system("killall arecord")
             toggleButton.set_label("record")
 
-    # print out the fix status
-    def printStatus(self, gps_device_iface):
-        fixStatus = gps_device_iface.GetFixStatus()
-        print("fix status:"),
-        if fixStatus == 0:
-            print("Invalid")
-        elif fixStatus == 1:
-            print("None")
-        elif fixStatus == 2:
-            print("2 dimensional")
-        elif fixStatus == 3:
-            print("3 dimensional")
-
-    # TODO: comment
+    # This function gets called when the record-button is pressed.
+    # The position and audio-filename will be written into the GPX-file.
     def printPosition(self, lat, lon, audioFilename):
 	self._wptlogfile.write("<wpt lat=\"{0}\" lon=\"{1}\">".format(lat,lon))
         self._wptlogfile.write("<desc>audiomapping waypoint</desc>")
 	self._wptlogfile.write("<link href=\"{0}\"><text>{0}</text></link>".format(audioFilename))
         self._wptlogfile.write("</wpt>")
-
-    # print out the connection status
-    def printConnectionStatus(self, gps_device_iface):
-        connectionStatus = gps_device_iface.GetConnectionStatus()
-        if connectionStatus:
-            print("gps-device is connected")
-        else:
-            print("gps-device seems to be disconnected")
 
     # print out the current accuracy
     def printAccuracy(self, gps_accuracy_iface):
@@ -151,7 +137,8 @@ class AudioMapper:
         print("vdop: {0}".format(vdop))
         print("")
 
-    # TODO: comment
+    # This function is called when the position changed.
+    # The changed position will be written into the GPX-file.
     def printPositionChanged(self, validity, timestamp, lat, lon, alt):
 	(field, timestamp, speed, heading, climb) = self.gps_course_iface.GetCourse()
         self._gpxlogfile.write("<trkpt lat=\"{0}\" lon=\"{1}\">".format(lat, lon))
@@ -160,7 +147,8 @@ class AudioMapper:
         self._gpxlogfile.write("<course>{0}</course>".format(heading))
         self._gpxlogfile.write("</trkpt>")
     
-    # TODO: comment
+    # This function is called at the start of the application and
+    # does all necessary initialisation-stuff.
     def __init__(self):
         self.config = self.loadConfig()
         if not os.path.exists(self.config["DATA_DIR"]):
@@ -206,33 +194,33 @@ class AudioMapper:
         self.gps_course_iface = dbus.Interface(self.gps_daemon,
                 "org.freedesktop.Gypsy.Course")
 
-        # zum PositionChanged-event verbinden
+        # DBUS-connect to the PositionChanged-event 
         self.gps_position_iface.connect_to_signal("PositionChanged",self.printPositionChanged)
         #self.loop.run()
 
-        # zum FixStatusChanged-event verbinden
+        # DBUS-connect to the FixStatusChanged-event
         self.gps_device_iface.connect_to_signal("FixStatusChanged",self.fixStatusChanged)
 
-        # GUI bauen
+        # build the GUI
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.connect("destroy",self.destroy)
         self.window.show()
 
-        # Aufnahmeknopf
+        # record button
         self.button = gtk.ToggleButton("Record")
         self.button.connect("toggled",self.toggled)
 
-        # Quit-Button
+        # quit button
         self.quitbutton = gtk.Button("quit")
         self.quitbutton.connect("clicked",self.destroy)
 
-        # Status-Anzeige
+        # status display
         self.status = gtk.Label("unfixed")
 	
-	# Tabelle fuer das Layout erstellen
+	# a table for the layout
         self.table = gtk.Table(3,3,True)
 
-        # Der Tabelle die Bedienelemente hinzufuegen
+        # fill table with the GUI-elements
         self.table.attach(self.button,1,2,1,2)
         self.table.attach(self.quitbutton,0,1,0,1)
         self.table.attach(self.status,0,1,1,2)
@@ -240,22 +228,23 @@ class AudioMapper:
         #label = self.button.get_children()[0]
         #label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("red"))
 
-        # Knopf dem Fenster zufuegen
+        # add the table to the GUI-window
         self.window.add(self.table)
 
-	# Tabelle sichtbar machen
+	# make the GUI-elements visible
         self.table.show()
-
-        # Elemente sichtbar machen
         self.button.show()
         self.quitbutton.show()
         self.status.show()
 
     
-    # TODO: comment
+    # This is where the application starts. The next function that
+    # will be executed after gtk.main() is the init-function
     def main(self):
         gtk.main()
 
+# only run the application if it is the main-application and not
+# just imported by another application.
 if __name__ == "__main__":
     audioMapper = AudioMapper()
     audioMapper.main()
